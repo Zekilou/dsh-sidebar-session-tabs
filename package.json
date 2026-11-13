@@ -13,7 +13,9 @@
     "index.js",
     "client.js",
     "cordis.patch.yml",
-    "icon.svg"
+    "icon.svg",
+    "assets/icon-180.png",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
     "dsh": ">=0.2.1-rc.5 <0.3.0-0"
