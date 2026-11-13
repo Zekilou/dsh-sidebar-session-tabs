@@ -1,0 +1,12 @@
+# Sidebar session tabs: a fork of ui-workspace that adds the filter tab strip
+# and per-session tags. The shipped browsing region is replaced by this row, so
+# its row is disabled here; every other registration of that package (actions,
+# dialogs, notices, shortcuts, the uiWorkspace service) lives in the fork.
+
+# The fork owns `sidebar.workspaces` and the `uiWorkspace` service.
+- id: ui-workspace
+  disabled: true
+
+- insert:
+    - id: sidebar-session-tabs
+      name: '@zekilou/dsh-sidebar-session-tabs'
