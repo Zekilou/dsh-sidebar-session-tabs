@@ -1,0 +1,13 @@
+{
+  "name": "@example/dsh-native-filter-source",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal filterOnly source: a tab that filters native sessions by id prefix.",
+  "exports": { ".": "./index.js", "./client": "./client.js" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "immediately": true, "inject": ["@zekilou/dsh-sidebar-session-tabs"] }
+  },
+  "license": "MIT"
+}

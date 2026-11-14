@@ -1,0 +1,3 @@
+- insert:
+    - id: example-native-filter
+      name: '@example/dsh-native-filter-source'

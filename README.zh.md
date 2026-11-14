@@ -74,6 +74,30 @@ window.__ModuleLoader__.load({
 - **悬停卡片**：完整标题、相对时间、来源名与其彩色圆点。
 - **点击行会调用你的 `open(session, row)`**；区域绝不猜「打开一台远端机器上的会话」意味着什么。`open()` 抛错或返回 rejected promise 只会记一条日志，不影响其他行。
 
+### 用 `filterOnly` 给原生会话按来源做筛选
+
+如果你的插件已经把远端会话并进了本机列表（它们就是普通行，出现在正常的工作区分组里），你不会想要第二份副本——你要的是**一个筛选维度**。注册一个 `filterOnly` 来源：
+
+```js
+ctx.sidebarSessionSources.register({
+  id: 'zeki',
+  label: '另一台机器',
+  filterOnly: true,                                  // 不贡献自己的行
+  ownsNativeSession: (sessionId) => sessionId.startsWith('remote:zeki/'),  // 必填
+  getSnapshot: () => ({ groups: [], sessions: [] }),  // 仍然必填，Tab 靠它占位
+})
+```
+
+- **注册即出 Tab**，即使该来源还没有任何行——Tab 条由注册表推导，不由「有没有行」推导。
+- 选中后**保留 `ownsNativeSession` 认领的原生行**，其余隐去。它们就是普通会话，所以点击走正常的 `sessions.retain()` 路径：历史、继续对话，都不受影响。
+- 该 Tab 的数量 = 它认领的原生行数。
+- `filterOnly` 来源不会产生分组区，因此不会多出空分组。
+- 一个来源可以两者兼得：既贡献自己的行，**也**认领原生行，两者合并到同一个 Tab。
+- `ownsNativeSession` 每次推导都会对可见行逐行调用，请保持 O(1)（例如 id 前缀判断），不要在里面扫远端列表。
+- 它抛错时该 Tab 回落到「不过滤」，而不是把列表清空；Tab 指向一个已不存在的来源时同样回落。
+
+没有声明 `ownsNativeSession` 的来源行为与之前完全一致：它的 Tab 只筛自己贡献的行。
+
 设计上有意**不支持**的：通过本机动作去重命名、归档、固定、分叉、拖拽排序或给远端行打标签。这些动作写的是本机的 Workspace 注册表和会话日志，它们并不拥有那个远端会话。需要这类能力时，来源应自己提供入口（例如往 `sidebar.workspaces.session.menu.item` 注册一个菜单项，或在它自己的分组标题里放控件）。
 
 容错：`getSnapshot()` 抛错、返回非对象或产出畸形行的来源会被跳过（`console.warn`），其余列表照常渲染；`id` 重复、缺 `open`、缺 `getSnapshot` 会在 `register()` 时直接抛错。**没有注册任何来源时——也就是所有现有用户——区域渲染结果与加这个扩展点之前完全一致**，也不会走任何读注册表的代码路径。

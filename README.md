@@ -74,6 +74,30 @@ What the region does with a registered source:
 - **Hover card** — full title, relative time, and the source name with its accent dot.
 - **Clicking a row calls your `open(session, row)`**; the region never guesses what opening a remote session means. If `open()` throws or returns a rejecting promise, it is logged and nothing else changes.
 
+### Filtering native sessions by origin (`filterOnly`)
+
+If your plugin already merges remote sessions into the local list — so they arrive as ordinary rows in the normal workspace groups — you do not want a second copy of them. What you want is a **filter dimension**. Register a `filterOnly` source:
+
+```js
+ctx.sidebarSessionSources.register({
+  id: 'zeki',
+  label: 'Your other machine',
+  filterOnly: true,                                  // contributes no rows of its own
+  ownsNativeSession: (sessionId) => sessionId.startsWith('remote:zeki/'),  // required
+  getSnapshot: () => ({ groups: [], sessions: [] }),  // still required, still wins a tab
+})
+```
+
+- The tab appears **as soon as the source is registered**, even while it has no rows — the strip is derived from the registry, not from contributed rows.
+- Selecting it **keeps the native rows that `ownsNativeSession` claims** and drops the rest. They are ordinary sessions, so clicking one goes through the normal `sessions.retain()` path: history, continuation, everything.
+- Its tab count is the number of native rows it claims.
+- `filterOnly` sources never produce a group section, so no empty group is rendered.
+- A source may combine both: contribute its own rows **and** claim native ones. Both land on the same tab.
+- `ownsNativeSession` is called per visible row on each derivation. Keep it O(1) — an id prefix test, not a lookup that scans a remote list.
+- If it throws, that source's tab falls back to unfiltered rather than blanking the list. If a tab names a source that is no longer registered, the view falls back to unfiltered too.
+
+A source without `ownsNativeSession` behaves exactly as before: its tab filters to its own contributed rows.
+
 What a source **cannot** do, by design: rename, archive, pin, fork, drag-reorder, or tag a foreign row through the local actions. Those actions write to this machine's Workspace registry and session log, which do not own the remote session. A source that needs such an operation must expose its own affordance (for example a row menu item registered into `sidebar.workspaces.session.menu.item`, or its own control in the source's group header).
 
 Failure handling: a source whose `getSnapshot()` throws, returns a non-object, or yields malformed rows is skipped (`console.warn`) and the rest of the list still renders. A duplicate `id`, a missing `open`, or `getSnapshot` is rejected at `register()` time with a thrown `Error`. With no source registered — which is every existing user — the region renders exactly what it rendered before this extension point existed, and no code path reads the registry.

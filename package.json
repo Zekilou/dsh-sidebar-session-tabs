@@ -1,6 +1,6 @@
 {
   "name": "@zekilou/dsh-sidebar-session-tabs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Filter tabs and tags for the Harness sidebar session list: All, Running, Needs me, Pinned, and one tab per user tag.",
   "exports": {

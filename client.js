@@ -3585,16 +3585,22 @@ window.__ModuleLoader__.load({
 			const tagState = useSessionTabState();
 			const tagStatuses = useSessionStatus((snapshot) => snapshot);
 			const sourcePages = useSourcePages(sessionSources);
+			const sourceRevision = useSourceRevision(sessionSources);
 			const sourceSections = (0, react.useMemo)(() => deriveSourceSections(sourcePages), [sourcePages]);
+			/**
+			* One tab per REGISTERED source, not per source with rows: a source that
+			* only labels native Sessions (`filterOnly`) still earns its filter entry.
+			* Registration order is the strip order; a filterOnly source contributes no
+			* rows, so its count comes from the native Sessions it claims.
+			*/
 			const sourceTabs = (0, react.useMemo)(() => {
-				const seen = new Map();
-				for (const section of sourceSections) if (!seen.has(section.sourceId)) seen.set(section.sourceId, {
-					id: section.sourceId,
-					label: section.rows[0]?.sourceLabel ?? section.sourceId,
-					accent: section.accent
-				});
-				return [...seen.values()];
-			}, [sourceSections]);
+				if (sessionSources === void 0) return EMPTY_SOURCE_TABS;
+				return sessionSources.list().map((source) => ({
+					id: source.id,
+					label: typeof source.label === "string" && source.label !== "" ? source.label : source.id,
+					accent: typeof source.accent === "string" ? source.accent : void 0
+				}));
+			}, [sessionSources, sourceRevision]);
 			/**
 			* Open one foreign row by handing it back to the source that contributed
 			* it. The region never guesses what "open" means for another machine: the
@@ -3757,19 +3763,22 @@ window.__ModuleLoader__.load({
 			const saveSessionOrder = (accountKey, order) => {
 				actions.setSessionOrder(accountKey, order, activeSessionOrders);
 			};
-			const tagCounts = (0, react.useMemo)(() => countSessionTabs(list, tagStatuses, pinnedSessionIds, archivedSessionIds, tagState, sourceSections), [
+			const registeredSources = (0, react.useMemo)(() => sessionSources === void 0 ? EMPTY_SOURCE_TABS : sessionSources.list(), [sessionSources, sourceRevision]);
+			const tagCounts = (0, react.useMemo)(() => countSessionTabs(list, tagStatuses, pinnedSessionIds, archivedSessionIds, tagState, sourceSections, registeredSources), [
 				archivedSessionIds,
 				list,
 				pinnedSessionIds,
+				registeredSources,
 				sourceSections,
 				tagState,
 				tagStatuses
 			]);
-			const filterIds = (0, react.useMemo)(() => visibleIdsForTabs(list, tagStatuses, pinnedSessionIds, archivedSessionIds, tagState, currentBlank), [
+			const filterIds = (0, react.useMemo)(() => visibleIdsForTabs(list, tagStatuses, pinnedSessionIds, archivedSessionIds, tagState, currentBlank, registeredSources), [
 				archivedSessionIds,
 				currentBlank,
 				list,
 				pinnedSessionIds,
+				registeredSources,
 				tagState,
 				tagStatuses
 			]);
@@ -5430,7 +5439,7 @@ window.__ModuleLoader__.load({
 		* Sessions only (blank drafts and subagent children never count).
 		* @returns a count keyed by tab id (`all`, `running`, `pending`, `pinned`, `tag:<id>`).
 		*/
-		function countSessionTabs(list, statuses, pinnedSessionIds, archivedSessionIds, state, sourceSections = []) {
+		function countSessionTabs(list, statuses, pinnedSessionIds, archivedSessionIds, state, sourceSections = [], sources = EMPTY_SOURCE_TABS) {
 			const archived = new Set(archivedSessionIds);
 			const pinned = new Set(pinnedSessionIds);
 			const counts = {
@@ -5459,6 +5468,23 @@ window.__ModuleLoader__.load({
 				const key = `source:${row.sourceId}`;
 				counts[key] = (counts[key] ?? 0) + 1;
 			}
+			// Native rows a source claims count toward that source's tab even though
+			// they are local Sessions with no contributed row of their own.
+			for (const source of sources) {
+				if (typeof source.ownsNativeSession !== "function") continue;
+				const key = `source:${source.id}`;
+				counts[key] = counts[key] ?? 0;
+				for (const id of list.ids) {
+					const summary = list.byId[id];
+					if (summary === void 0 || summary.blank || summary.origin === "subagent" || archived.has(id)) continue;
+					try {
+						if (source.ownsNativeSession(id) === true) counts[key] += 1;
+					} catch (error) {
+						console.warn(`[sidebar-session-tabs] source "${source.id}" threw in ownsNativeSession():`, error);
+						break;
+					}
+				}
+			}
 			return counts;
 		}
 		/**
@@ -5466,14 +5492,36 @@ window.__ModuleLoader__.load({
 		* "all" tab (which must keep the shipped derivation untouched). The current
 		* blank draft always stays visible so a new Session is never hidden by a filter.
 		*/
-		function visibleIdsForTabs(list, statuses, pinnedSessionIds, archivedSessionIds, state, currentBlank) {
+		function visibleIdsForTabs(list, statuses, pinnedSessionIds, archivedSessionIds, state, currentBlank, sources = EMPTY_SOURCE_TABS) {
 			const active = state.active;
 			if (active === "all") return void 0;
 			const archived = new Set(archivedSessionIds);
 			const pinned = new Set(pinnedSessionIds);
 			const tagId = active.startsWith("tag:") ? active.slice(4) : void 0;
 			if (tagId !== void 0 && !state.tabs.some((tag) => tag.id === tagId)) return void 0;
-			if (active.startsWith("source:")) return void 0;
+			if (active.startsWith("source:")) {
+				const wanted = active.slice("source:".length);
+				const source = sources.find((entry) => entry.id === wanted);
+				// An unregistered (or removed) source must not blank the list: fall
+				// back to the unfiltered view rather than an empty one.
+				if (source === void 0 || typeof source.ownsNativeSession !== "function") return void 0;
+				const ids = new Set();
+				for (const id of list.ids) {
+					const summary = list.byId[id];
+					if (summary === void 0 || summary.blank || summary.origin === "subagent") continue;
+					if (archived.has(id)) continue;
+					let owned = false;
+					try {
+						owned = source.ownsNativeSession(id) === true;
+					} catch (error) {
+						console.warn(`[sidebar-session-tabs] source "${wanted}" threw in ownsNativeSession():`, error);
+						return void 0;
+					}
+					if (owned) ids.add(id);
+				}
+				if (currentBlank !== void 0) ids.add(currentBlank);
+				return ids;
+			}
 			const ids = new Set();
 			for (const id of list.ids) {
 				const summary = list.byId[id];
@@ -5939,6 +5987,8 @@ window.__ModuleLoader__.load({
 		 */
 		/** Stable empty result, so a source-less region never re-renders from a fresh array. */
 		const EMPTY_SOURCE_PAGES = [];
+		/** Stable empty tab list, for the same reason. */
+		const EMPTY_SOURCE_TABS = [];
 		/** Row/session identity prefix that keeps a foreign id from colliding with a local SessionId. */
 		const SOURCE_SESSION_PREFIX = "src:";
 		/** Key of the built-in pseudo-source that reports the local Session Controller. */
@@ -5981,7 +6031,10 @@ window.__ModuleLoader__.load({
 				if (id === "") throw new Error("sidebarSessionSources.register: `id` is required");
 				if (id === LOCAL_SOURCE_ID) throw new Error(`sidebarSessionSources.register: \`${LOCAL_SOURCE_ID}\` is reserved`);
 				if (typeof source.getSnapshot !== "function") throw new Error(`sidebarSessionSources.register: source "${id}" has no getSnapshot()`);
-				if (typeof source.open !== "function") throw new Error(`sidebarSessionSources.register: source "${id}" has no open()`);
+				const filterOnly = source.filterOnly === true;
+				if (!filterOnly && typeof source.open !== "function") throw new Error(`sidebarSessionSources.register: source "${id}" has no open()`);
+				if (source.ownsNativeSession !== void 0 && typeof source.ownsNativeSession !== "function") throw new Error(`sidebarSessionSources.register: source "${id}" declared a non-function ownsNativeSession`);
+				if (filterOnly && typeof source.ownsNativeSession !== "function") throw new Error(`sidebarSessionSources.register: filterOnly source "${id}" needs ownsNativeSession()`);
 				if (this.sources.some((entry) => entry.id === id)) throw new Error(`sidebarSessionSources.register: source "${id}" is already registered`);
 				const entry = {
 					...source,
@@ -6092,6 +6145,20 @@ window.__ModuleLoader__.load({
 			};
 		}
 		/**
+		* Hook over the registry's own change counter. It moves when a source
+		* registers or unregisters — not when a source's data changes — so the tab
+		* list is rebuilt for a source coming or going and left alone for a poll.
+		* The hook is called unconditionally (hooks rule) and reads an absent
+		* service as revision 0.
+		* @param registry - the source registry service, or undefined on an older host.
+		* @returns the current revision.
+		*/
+		function useSourceRevision(registry) {
+			const subscribe = (0, react.useCallback)((listener) => registry === void 0 ? () => {} : registry.version.subscribe(listener), [registry]);
+			const getSnapshot = (0, react.useCallback)(() => registry === void 0 ? 0 : registry.version.getSnapshot(), [registry]);
+			return (0, react.useSyncExternalStore)(subscribe, getSnapshot);
+		}
+		/**
 		* Hook over the merged source pages. Absent service, no sources, or a source
 		* that fails all resolve to an empty array, and the region then renders
 		* exactly what it rendered before any source existed.
@@ -6128,6 +6195,7 @@ window.__ModuleLoader__.load({
 			const sections = [];
 			for (const page of pages) {
 				const source = page.source;
+				if (source.filterOnly === true) continue;
 				if (page.sessions.length === 0) continue;
 				const declared = new Map();
 				for (const group of page.groups) {
