@@ -33,6 +33,51 @@
 
 当前空白草稿在每个 Tab 都保留；已归档会话仍跟随该区域自己的归档筛选，不跟 Tab 联动。
 
+## 让别的来源往列表里贡献会话
+
+Tab 条和列表默认都由本地 Session Controller 推导，但这个区域也接受**外部会话来源**：你自己的一个小插件就能把别处的会话（另一台机器上跑着的 harness、一个投影、一份测试数据）贡献进同一个列表，**不需要 fork 这个包**。
+
+```js
+// 你的插件的 client.js
+window.__ModuleLoader__.load({
+  id: 'acme-remote-sessions',
+  factory(require) {
+    return {
+      inject: ['sidebarSessionSources'],   // ← 本包提供的 service
+      apply(ctx) {
+        const dispose = ctx.sidebarSessionSources.register({
+          id: 'acme',                 // 稳定且唯一；'local' 是保留字
+          label: 'Acme box',          // 分组标题
+          accent: '#6f8ff5',          // 可选：行首圆点颜色
+          getSnapshot: () => ({
+            groups: [{ id: 'g1', label: 'Acme box' }],
+            sessions: [
+              { id: 'a1b2', title: '重构解析器', updatedAt: Date.now(), group: 'g1', running: true },
+            ],
+          }),
+          subscribe: (listener) => trackChange(listener),   // 可选，返回退订函数
+          open: (session) => openOnTheOtherMachine(session), // 必填：跳转由来源自己决定
+        })
+        ctx.effect(() => () => dispose(), 'acme: source')
+      },
+    }
+  },
+})
+```
+
+区域会怎么用它：
+
+- **每个来源一个分组区**，标题就是来源的 `label`，带行数——「这是哪台机器来的」是结构，不用每行再写一遍；一个来源内部可以再声明多个分组。
+- **和本机会话同一套行样式**：32px、同样的悬停、同样的标题裁切、同样的紧凑相对时间；组内按 `updatedAt` 排序。
+- **筛选 Tab 条里多一个 Tab**：按来源一个（只在该来源真的有行时才出现），带该来源的实时数量；选中即只显示该来源，本机分组隐去。
+- **搜索**：标题或来源名命中当前关键词的远端行会出现在搜索结果里，并标明来源。
+- **悬停卡片**：完整标题、相对时间、来源名与其彩色圆点。
+- **点击行会调用你的 `open(session, row)`**；区域绝不猜「打开一台远端机器上的会话」意味着什么。`open()` 抛错或返回 rejected promise 只会记一条日志，不影响其他行。
+
+设计上有意**不支持**的：通过本机动作去重命名、归档、固定、分叉、拖拽排序或给远端行打标签。这些动作写的是本机的 Workspace 注册表和会话日志，它们并不拥有那个远端会话。需要这类能力时，来源应自己提供入口（例如往 `sidebar.workspaces.session.menu.item` 注册一个菜单项，或在它自己的分组标题里放控件）。
+
+容错：`getSnapshot()` 抛错、返回非对象或产出畸形行的来源会被跳过（`console.warn`），其余列表照常渲染；`id` 重复、缺 `open`、缺 `getSnapshot` 会在 `register()` 时直接抛错。**没有注册任何来源时——也就是所有现有用户——区域渲染结果与加这个扩展点之前完全一致**，也不会走任何读注册表的代码路径。
+
 ## 安装
 
 前提：暴露 `plugin_manager` 工具的 Harness profile（`web` profile 自带），dsh 0.2.x。

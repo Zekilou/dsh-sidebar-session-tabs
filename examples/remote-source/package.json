@@ -1,0 +1,20 @@
+{
+  "name": "@example/dsh-remote-sessions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal example: contribute sessions from another machine to dsh-sidebar-session-tabs.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@zekilou/dsh-sidebar-session-tabs"]
+    }
+  },
+  "license": "MIT"
+}

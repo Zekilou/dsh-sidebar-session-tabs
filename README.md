@@ -33,6 +33,51 @@ Filter semantics:
 
 The current blank draft stays visible in every tab, and archived sessions keep following the region's own archived filter rather than the tabs.
 
+## Contributing sessions from another source
+
+The tab strip and the list are built from the local Session Controller, but the region also accepts **foreign session sources**: a small plugin of your own can contribute sessions that live somewhere else — another machine's harness behind SSH, a projection, a fixture — without forking this package.
+
+```js
+// client.js of your plugin
+window.__ModuleLoader__.load({
+  id: 'acme-remote-sessions',
+  factory(require) {
+    return {
+      inject: ['sidebarSessionSources'],   // ← the service this package provides
+      apply(ctx) {
+        const dispose = ctx.sidebarSessionSources.register({
+          id: 'acme',                 // stable and unique; 'local' is reserved
+          label: 'Acme box',          // group header text
+          accent: '#6f8ff5',          // optional row dot color
+          getSnapshot: () => ({
+            groups: [{ id: 'g1', label: 'Acme box' }],
+            sessions: [
+              { id: 'a1b2', title: 'Refactor the parser', updatedAt: Date.now(), group: 'g1', running: true },
+            ],
+          }),
+          subscribe: (listener) => trackChange(listener),  // optional; returns an unsubscribe
+          open: (session) => openOnTheOtherMachine(session), // required; the source owns navigation
+        })
+        ctx.effect(() => () => dispose(), 'acme: source')
+      },
+    }
+  },
+})
+```
+
+What the region does with a registered source:
+
+- **One group section per source**, headed with the source's `label` and its row count, so "which machine is this from" is structural rather than a label on every row. A source may declare several groups inside its section.
+- **The same row geometry as local sessions** — 32px, same hover, same title clip, same compact relative time. Rows are sorted by `updatedAt` inside their group.
+- **A tab in the filter strip**, one per source that actually has rows, carrying that source's live count. Selecting it narrows the list to that source; the local groups disappear.
+- **Search** — a foreign row whose title (or source label) matches the current query appears in the search results, tagged with its source.
+- **Hover card** — full title, relative time, and the source name with its accent dot.
+- **Clicking a row calls your `open(session, row)`**; the region never guesses what opening a remote session means. If `open()` throws or returns a rejecting promise, it is logged and nothing else changes.
+
+What a source **cannot** do, by design: rename, archive, pin, fork, drag-reorder, or tag a foreign row through the local actions. Those actions write to this machine's Workspace registry and session log, which do not own the remote session. A source that needs such an operation must expose its own affordance (for example a row menu item registered into `sidebar.workspaces.session.menu.item`, or its own control in the source's group header).
+
+Failure handling: a source whose `getSnapshot()` throws, returns a non-object, or yields malformed rows is skipped (`console.warn`) and the rest of the list still renders. A duplicate `id`, a missing `open`, or `getSnapshot` is rejected at `register()` time with a thrown `Error`. With no source registered — which is every existing user — the region renders exactly what it rendered before this extension point existed, and no code path reads the registry.
+
 ## Install
 
 Prerequisites: a Harness profile that exposes the `plugin_manager` tool (the `web` profile does) and dsh 0.2.x.
