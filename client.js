@@ -3041,7 +3041,7 @@ window.__ModuleLoader__.load({
 			});
 		}
 		/** The scrolling session tree; unmounting drops the sessions subscription and the session watermarks. */
-		function SessionTree({ list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, rowState, onLeaveArchivedOnly, workspaceReady, animationResetKey, usePanelInfo, onRenameRequest, onDeleteRequest, onSessionRenameRequest, renderSlot, insertWorkspaceBefore, nestWorkspaces, groupExpansion, setGroupExpanded, setSessionOrder, home, t, revealSessionId, onSessionRevealed, shortcuts, filtered = false }) {
+		function SessionTree({ list, useSessionStatus, startSession, open, workspaces, ungroupedSessionIds, rowState, onLeaveArchivedOnly, workspaceReady, animationResetKey, usePanelInfo, onRenameRequest, onDeleteRequest, onSessionRenameRequest, renderSlot, insertWorkspaceBefore, nestWorkspaces, groupExpansion, setGroupExpanded, setSessionOrder, home, t, revealSessionId, onSessionRevealed, shortcuts, filtered = false, sourceSections = [], onOpenSource = () => {} }) {
 			const panelActive = usePanelInfo((info) => info.activePanelId !== null);
 			const statuses = useSessionStatus((s) => s);
 			const current = panelActive ? void 0 : Object.values(list.byId).find((session) => (session.retainedBy.mainView ?? 0) > 0)?.id;
@@ -3168,7 +3168,7 @@ window.__ModuleLoader__.load({
 			}, [groups, parents]);
 			const rootGroups = childrenByParent.get(void 0) ?? [];
 			const workspaceDropAtListStart = rootGroups[0]?.workspaceId !== void 0 && workspaceDrag?.over?.id === rootGroups[0].workspaceId && workspaceDrag.over.half === "before";
-			const rowKeys = groups.length === 0 ? ["empty"] : [];
+			const rowKeys = groups.length === 0 && sourceSections.length === 0 ? ["empty"] : [];
 			const renderGroup = (group, depth) => {
 				const workspaceId = group.workspaceId;
 				const children = childrenByParent.get(group.key) ?? [];
@@ -3348,6 +3348,12 @@ window.__ModuleLoader__.load({
 				}, group.key);
 			};
 			const groupRows = rootGroups.map((group) => renderGroup(group, 0));
+			const sourceRows = sourceSections.map((section) => (0, react_jsx_runtime.jsx)(SourceSection, {
+				section,
+				currentKey: void 0,
+				onOpen: onOpenSource,
+				t
+			}, `source:${section.sourceId}:${section.groupId}`));
 			return (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.HoverCardGroup, {
 				className: clsx(WorkspaceBrowser_module_css_default.treeBody, WorkspaceBrowser_module_css_default.wide),
 				children: [
@@ -3361,19 +3367,19 @@ window.__ModuleLoader__.load({
 						rowKeys,
 						ready: list.phase === "ready" && workspaceReady && !nativeDragActive,
 						resetKey: JSON.stringify([animationResetKey, watermarkMotionKey]),
-						children: [groups.length === 0 && (0, react_jsx_runtime.jsx)(EmptySessions, {
+						children: [groups.length === 0 && sourceRows.length === 0 && (0, react_jsx_runtime.jsx)(EmptySessions, {
 							rowState,
 							onLeaveArchivedOnly,
 							filtered,
 							t
-						}), groupRows]
+						}), groupRows, sourceRows]
 					}),
 					(0, react_jsx_runtime.jsx)("span", { className: WorkspaceBrowser_module_css_default.fade })
 				]
 			});
 		}
 		/** The flat "In one list" body: every session is one draggable top-level row. */
-		function FlatList({ list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, open, onSessionRenameRequest, usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed, renderSlot, t, filtered = false }) {
+		function FlatList({ list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, open, onSessionRenameRequest, usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed, renderSlot, t, filtered = false, sourceSections = [], onOpenSource = () => {} }) {
 			const panelActive = usePanelInfo((info) => info.activePanelId !== null);
 			const statuses = useSessionStatus((s) => s);
 			const rows = (0, react.useMemo)(() => deriveFlat(list, sessionIds, rowState, statuses), [
@@ -3399,10 +3405,10 @@ window.__ModuleLoader__.load({
 				children: [(0, react_jsx_runtime.jsxs)(AnimatedRows, {
 					className: clsx(WorkspaceBrowser_module_css_default.list, WorkspaceBrowser_module_css_default.flatList),
 					label: t("section.sessions"),
-					rowKeys: rows.length === 0 ? ["empty"] : rows.map((row) => `session:${row.id}`),
+					rowKeys: rows.length === 0 && sourceSections.length === 0 ? ["empty"] : [...rows.map((row) => `session:${row.id}`), ...sourceSections.map((section) => `source:${section.sourceId}:${section.groupId}`)],
 					ready: list.phase === "ready" && workspaceReady && drag === null,
 					resetKey: animationResetKey,
-					children: [rows.length === 0 && (0, react_jsx_runtime.jsx)(EmptySessions, {
+					children: [rows.length === 0 && sourceSections.length === 0 && (0, react_jsx_runtime.jsx)(EmptySessions, {
 						rowState,
 						onLeaveArchivedOnly,
 						filtered,
@@ -3455,12 +3461,17 @@ window.__ModuleLoader__.load({
 							},
 							t
 						}, node.id);
-					})]
+					}), sourceSections.map((section) => (0, react_jsx_runtime.jsx)(SourceSection, {
+						section,
+						currentKey: void 0,
+						onOpen: onOpenSource,
+						t
+					}, `source:${section.sourceId}:${section.groupId}`))]
 				}), (0, react_jsx_runtime.jsx)("span", { className: WorkspaceBrowser_module_css_default.fade })]
 			});
 		}
 		/** Flat search body: local metadata matches plus the current Host result page. */
-		function SearchResults({ useSessions, useSessionStatus, open, onUnarchive, workspaces, archivedSessionIds, archivedFilter, query, remote, resultLimit, usePanelInfo, t }) {
+		function SearchResults({ useSessions, useSessionStatus, open, onUnarchive, workspaces, archivedSessionIds, archivedFilter, query, remote, resultLimit, usePanelInfo, t, sourceSections = [], onOpenSource = () => {} }) {
 			const panelActive = usePanelInfo((info) => info.activePanelId !== null);
 			const list = useSessions((s) => s);
 			const statuses = useSessionStatus((s) => s);
@@ -3480,6 +3491,20 @@ window.__ModuleLoader__.load({
 				currentRemote,
 				resultLimit
 			]);
+			/** Foreign rows whose title matches, titled with their source so the origin stays visible in search. */
+			const sourceMatches = (0, react.useMemo)(() => {
+				const needle = query.trim().toLowerCase();
+				if (needle === "") return [];
+				const matches = [];
+				for (const section of sourceSections) for (const row of section.rows) {
+					if (!row.title.toLowerCase().includes(needle) && !row.sourceLabel.toLowerCase().includes(needle)) continue;
+					matches.push({
+						row,
+						label: row.sourceLabel
+					});
+				}
+				return matches;
+			}, [query, sourceSections]);
 			const pending = currentRemote.status === "loading";
 			const currentId = panelActive ? void 0 : Object.values(list.byId).find((session) => (session.retainedBy.mainView ?? 0) > 0)?.id;
 			return (0, react_jsx_runtime.jsxs)("div", {
@@ -3491,13 +3516,41 @@ window.__ModuleLoader__.load({
 							className: WorkspaceBrowser_module_css_default.searchTree,
 							role: "tree",
 							"aria-label": t("search.results.aria"),
-							children: results.items.map((result) => (0, react_jsx_runtime.jsx)(SearchResultItem, {
+							children: [...results.items.map((result) => (0, react_jsx_runtime.jsx)(SearchResultItem, {
 								result,
 								currentId,
 								onOpen: open,
 								onUnarchive,
 								t
-							}, result.id))
+							}, result.id)), ...sourceMatches.map((match) => (0, react_jsx_runtime.jsx)("div", {
+								"data-row-key": `source:${match.row.key}`,
+								className: Rows_module_css_default.searchResultRow,
+								role: "treeitem",
+								"aria-selected": false,
+								title: match.row.subtitle ?? match.row.title,
+								onClick: () => onOpenSource(match.row),
+								children: [h("span", {
+									className: Rows_module_css_default.searchResultHeading
+								}, [h("span", {
+									key: "slot",
+									className: Rows_module_css_default.slot,
+									children: h("span", {
+										className: ST.sourceDot,
+										style: {
+											background: match.row.running ? "var(--dsw-alias-state-business-primary)" : match.row.accent ?? "var(--dsw-alias-label-caption)"
+										}
+									})
+								}), h("span", {
+									key: "title",
+									className: Rows_module_css_default.searchResultTitle,
+									children: match.row.title === "" ? t("session.untitled") : match.row.title
+								})]), h("span", {
+									className: Rows_module_css_default.searchResultMeta
+								}, h("span", {
+									className: Rows_module_css_default.searchResultWorkspace,
+									children: match.label
+								}))]
+							}, match.row.key))]
 						}),
 						pending && (0, react_jsx_runtime.jsx)("div", {
 							role: "status",
@@ -3528,9 +3581,43 @@ window.__ModuleLoader__.load({
 		* @param props - composed slot props (shell owner share + store + injected actions).
 		* @returns the region element tree.
 		*/
-		function WorkspaceBrowser({ wide, usePanelInfo, expandSidebar, useSessions, useSessionStatus, useWorkspaces, useStore, actions, startSession, open, requestSessionRename, notifyArchivedNotOpenable, renameWorkspace, deleteWorkspace, insertWorkspaceBefore, unarchiveSession, createWorkspace, searchSessions, searchResultLimit, useDirectoryFlow, useHostInfo, useShortcuts, useWorkspaceShortcuts, requestSearch, requestAddWorkspace, closeAddWorkspace, setDirectoryBusy, renderSlot, t }) {
+		function WorkspaceBrowser({ wide, usePanelInfo, expandSidebar, useSessions, useSessionStatus, useWorkspaces, useStore, actions, sessionSources, startSession, open, requestSessionRename, notifyArchivedNotOpenable, renameWorkspace, deleteWorkspace, insertWorkspaceBefore, unarchiveSession, createWorkspace, searchSessions, searchResultLimit, useDirectoryFlow, useHostInfo, useShortcuts, useWorkspaceShortcuts, requestSearch, requestAddWorkspace, closeAddWorkspace, setDirectoryBusy, renderSlot, t }) {
 			const tagState = useSessionTabState();
 			const tagStatuses = useSessionStatus((snapshot) => snapshot);
+			const sourcePages = useSourcePages(sessionSources);
+			const sourceSections = (0, react.useMemo)(() => deriveSourceSections(sourcePages), [sourcePages]);
+			const sourceTabs = (0, react.useMemo)(() => {
+				const seen = new Map();
+				for (const section of sourceSections) if (!seen.has(section.sourceId)) seen.set(section.sourceId, {
+					id: section.sourceId,
+					label: section.rows[0]?.sourceLabel ?? section.sourceId,
+					accent: section.accent
+				});
+				return [...seen.values()];
+			}, [sourceSections]);
+			/**
+			* Open one foreign row by handing it back to the source that contributed
+			* it. The region never guesses what "open" means for another machine: the
+			* source may switch a tunnel, open a tab, or do nothing, and a throw here
+			* must not take the list down with it.
+			*/
+			const openSourceRow = (row) => {
+				try {
+					const result = row.source.open(row.raw, row);
+					if (result !== null && typeof result === "object" && typeof result.catch === "function") result.catch((error) => console.warn(`[sidebar-session-tabs] source "${row.sourceId}" open() rejected:`, error));
+				} catch (error) {
+					console.warn(`[sidebar-session-tabs] source "${row.sourceId}" open() threw:`, error);
+				}
+			};
+			/** Foreign sections the active filter tab keeps; a source tab keeps only its own. */
+			const visibleSourceSections = (0, react.useMemo)(() => {
+				if (tagState.active === "all") return sourceSections;
+				if (tagState.active.startsWith("source:")) {
+					const wanted = tagState.active.slice("source:".length);
+					return sourceSections.filter((section) => section.sourceId === wanted);
+				}
+				return [];
+			}, [sourceSections, tagState.active]);
 			const home = useHostInfo((info) => info.home);
 			const shortcuts = useShortcuts((rows) => rows);
 			const searchShortcut = shortcuts.find((row) => row.id === "session.search");
@@ -3670,10 +3757,11 @@ window.__ModuleLoader__.load({
 			const saveSessionOrder = (accountKey, order) => {
 				actions.setSessionOrder(accountKey, order, activeSessionOrders);
 			};
-			const tagCounts = (0, react.useMemo)(() => countSessionTabs(list, tagStatuses, pinnedSessionIds, archivedSessionIds, tagState), [
+			const tagCounts = (0, react.useMemo)(() => countSessionTabs(list, tagStatuses, pinnedSessionIds, archivedSessionIds, tagState, sourceSections), [
 				archivedSessionIds,
 				list,
 				pinnedSessionIds,
+				sourceSections,
 				tagState,
 				tagStatuses
 			]);
@@ -4004,6 +4092,7 @@ window.__ModuleLoader__.load({
 					}),
 					wide && (0, react_jsx_runtime.jsx)(SessionFilterTabs, {
 						counts: tagCounts,
+						sources: sourceTabs,
 						t
 					}),
 					!wide && (0, react_jsx_runtime.jsx)("div", {
@@ -4037,6 +4126,8 @@ window.__ModuleLoader__.load({
 							query: normalizedQuery,
 							remote: remoteSearch,
 							resultLimit: searchResultLimit,
+							sourceSections: visibleSourceSections,
+							onOpenSource: openSourceRow,
 							t
 						}) : groupBy === "flat" ? (0, react_jsx_runtime.jsx)(FlatList, {
 							usePanelInfo,
@@ -4047,6 +4138,8 @@ window.__ModuleLoader__.load({
 							workspaceReady,
 							animationResetKey: `${groupBy}/${orderBy}/${archivedFilter}/${activeFilterTab}`,
 							filtered: filterIds !== void 0,
+							sourceSections: visibleSourceSections,
+							onOpenSource: openSourceRow,
 							useSessionStatus,
 							open: guardedOpen,
 							onSessionRenameRequest: requestSessionRename,
@@ -4068,6 +4161,8 @@ window.__ModuleLoader__.load({
 							nestWorkspaces: groupBy === "workspace-tree",
 							animationResetKey: `${groupBy}/${orderBy}/${archivedFilter}/${activeFilterTab}`,
 							filtered: filterIds !== void 0,
+							sourceSections: visibleSourceSections,
+							onOpenSource: openSourceRow,
 							groupExpansion: browseGroupExpansion,
 							setGroupExpanded: actions.setGroupExpanded,
 							setSessionOrder: saveSessionOrder,
@@ -5100,7 +5195,7 @@ window.__ModuleLoader__.load({
 		 */
 		const h = react.createElement;
 		const SESSION_TABS_CSS_ID = "@zekilou/dsh-sidebar-session-tabs/tabs.css";
-		const SESSION_TABS_CSS = ".dsh_st_tabs{display:flex;align-items:center;gap:2px;flex:none;min-height:26px;margin:0 0 4px;padding:0 0 0 2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}.dsh_st_tabs::-webkit-scrollbar{display:none}.dsh_st_tab{box-sizing:border-box;display:inline-flex;align-items:center;gap:5px;flex:none;height:22px;padding:0 7px;border:none;border-radius:var(--dsw-radius-md);background:0 0;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;line-height:16px;cursor:pointer;-webkit-user-select:none;user-select:none;white-space:nowrap;transition:background-color .12s var(--ds-ease-in-out),color .12s var(--ds-ease-in-out)}.dsh_st_tab:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dsh_st_tab:focus-visible,.dsh_st_add:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:-2px}.dsh_st_tabActive{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dsh_st_tabDot{width:6px;height:6px;border-radius:50%;flex:none}.dsh_st_count{color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:14px;font-variant-numeric:tabular-nums}.dsh_st_tabActive .dsh_st_count{color:var(--dsw-alias-label-secondary)}.dsh_st_tabInput{box-sizing:border-box;flex:none;width:84px;height:22px;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-button-elevated-fill,transparent);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;line-height:16px;padding:0 6px;outline:none}.dsh_st_add{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border:none;border-radius:var(--dsw-radius-md);background:0 0;color:var(--dsw-alias-label-tertiary);cursor:pointer}.dsh_st_add:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dsh_st_rowTags{display:inline-flex;align-items:center;gap:3px;flex:none;margin-left:2px}.dsh_st_tagList{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto;margin:2px 0 6px}.dsh_st_tagRow{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:none;border-radius:var(--dsw-radius-md);background:0 0;color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;line-height:20px;text-align:left;cursor:pointer}.dsh_st_tagRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.dsh_st_check{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;flex:none;border:.5px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:4px;color:#fff;font-size:10px;line-height:1}.dsh_st_checkOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}.dsh_st_tagName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh_st_tagEmpty{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;padding:4px 0 6px}.dsh_st_newRow{display:flex;align-items:center;gap:8px;margin-top:6px}.dsh_st_newInput{flex:1;box-sizing:border-box;height:28px;padding:0 8px;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-button-elevated-fill,transparent);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}.dsh_st_hoverTags{display:flex;flex-wrap:wrap;gap:4px}.dsh_st_hoverTag{display:inline-flex;align-items:center;gap:4px;color:#cfd3d6;font-size:12px;line-height:16px}";
+		const SESSION_TABS_CSS = ".dsh_st_tabs{display:flex;align-items:center;gap:2px;flex:none;min-height:26px;margin:0 0 4px;padding:0 0 0 2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}.dsh_st_tabs::-webkit-scrollbar{display:none}.dsh_st_tab{box-sizing:border-box;display:inline-flex;align-items:center;gap:5px;flex:none;height:22px;padding:0 7px;border:none;border-radius:var(--dsw-radius-md);background:0 0;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;line-height:16px;cursor:pointer;-webkit-user-select:none;user-select:none;white-space:nowrap;transition:background-color .12s var(--ds-ease-in-out),color .12s var(--ds-ease-in-out)}.dsh_st_tab:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dsh_st_tab:focus-visible,.dsh_st_add:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:-2px}.dsh_st_tabActive{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dsh_st_tabDot{width:6px;height:6px;border-radius:50%;flex:none}.dsh_st_count{color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:14px;font-variant-numeric:tabular-nums}.dsh_st_tabActive .dsh_st_count{color:var(--dsw-alias-label-secondary)}.dsh_st_tabInput{box-sizing:border-box;flex:none;width:84px;height:22px;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-button-elevated-fill,transparent);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;line-height:16px;padding:0 6px;outline:none}.dsh_st_add{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border:none;border-radius:var(--dsw-radius-md);background:0 0;color:var(--dsw-alias-label-tertiary);cursor:pointer}.dsh_st_add:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dsh_st_sourceDot{width:7px;height:7px;border-radius:50%;flex:none;display:inline-block}.dsh_st_rowTags{display:inline-flex;align-items:center;gap:3px;flex:none;margin-left:2px}.dsh_st_tagList{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto;margin:2px 0 6px}.dsh_st_tagRow{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:none;border-radius:var(--dsw-radius-md);background:0 0;color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;line-height:20px;text-align:left;cursor:pointer}.dsh_st_tagRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.dsh_st_check{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;flex:none;border:.5px solid var(--dsw-alias-border-l2,var(--dsw-alias-border-l1));border-radius:4px;color:#fff;font-size:10px;line-height:1}.dsh_st_checkOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}.dsh_st_tagName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh_st_tagEmpty{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;padding:4px 0 6px}.dsh_st_newRow{display:flex;align-items:center;gap:8px;margin-top:6px}.dsh_st_newInput{flex:1;box-sizing:border-box;height:28px;padding:0 8px;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-button-elevated-fill,transparent);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}.dsh_st_hoverTags{display:flex;flex-wrap:wrap;gap:4px}.dsh_st_hoverTag{display:inline-flex;align-items:center;gap:4px;color:#cfd3d6;font-size:12px;line-height:16px}";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(SESSION_TABS_CSS_ID) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@zekilou/dsh-sidebar-session-tabs";
@@ -5116,6 +5211,7 @@ window.__ModuleLoader__.load({
 			count: "dsh_st_count",
 			tabInput: "dsh_st_tabInput",
 			add: "dsh_st_add",
+			sourceDot: "dsh_st_sourceDot",
 			rowTags: "dsh_st_rowTags",
 			tagList: "dsh_st_tagList",
 			tagRow: "dsh_st_tagRow",
@@ -5334,7 +5430,7 @@ window.__ModuleLoader__.load({
 		* Sessions only (blank drafts and subagent children never count).
 		* @returns a count keyed by tab id (`all`, `running`, `pending`, `pinned`, `tag:<id>`).
 		*/
-		function countSessionTabs(list, statuses, pinnedSessionIds, archivedSessionIds, state) {
+		function countSessionTabs(list, statuses, pinnedSessionIds, archivedSessionIds, state, sourceSections = []) {
 			const archived = new Set(archivedSessionIds);
 			const pinned = new Set(pinnedSessionIds);
 			const counts = {
@@ -5356,6 +5452,13 @@ window.__ModuleLoader__.load({
 				const assigned = state.assignments[id];
 				if (assigned !== void 0) for (const tagId of assigned) if (counts[`tag:${tagId}`] !== void 0) counts[`tag:${tagId}`] += 1;
 			}
+			for (const section of sourceSections) for (const row of section.rows) {
+				counts.all += 1;
+				if (row.running) counts.running += 1;
+				if (row.pending) counts.pending += 1;
+				const key = `source:${row.sourceId}`;
+				counts[key] = (counts[key] ?? 0) + 1;
+			}
 			return counts;
 		}
 		/**
@@ -5370,6 +5473,7 @@ window.__ModuleLoader__.load({
 			const pinned = new Set(pinnedSessionIds);
 			const tagId = active.startsWith("tag:") ? active.slice(4) : void 0;
 			if (tagId !== void 0 && !state.tabs.some((tag) => tag.id === tagId)) return void 0;
+			if (active.startsWith("source:")) return void 0;
 			const ids = new Set();
 			for (const id of list.ids) {
 				const summary = list.byId[id];
@@ -5390,6 +5494,132 @@ window.__ModuleLoader__.load({
 			if (currentBlank !== void 0) ids.add(currentBlank);
 			return ids;
 		}
+		/**
+		* One foreign consumer's group section: a header row that names the machine
+		* and every row it contributes. Rows reuse the shipped session-row geometry
+		* (32px, same hover, same title clip, same time cell) so a list mixing local
+		* and foreign Sessions reads as one list; only the accent dot and the open
+		* behavior differ, and the open behavior belongs to the source.
+		*/
+		function SourceSection({ section, currentKey, onOpen, t }) {
+			const sessionRows = section.rows.map((row) => {
+				const selected = row.key === currentKey;
+				const anchor = h("div", {
+					key: row.key,
+					"data-row-key": `source:${row.key}`,
+					className: clsx(Rows_module_css_default.sessionRow, selected && Rows_module_css_default.selected),
+					role: "treeitem",
+					"aria-selected": selected,
+					title: row.subtitle ?? row.title,
+					onClick: () => onOpen(row),
+					children: [
+						h("span", {
+							key: "slot",
+							className: Rows_module_css_default.slot,
+							children: h("span", {
+								className: ST.sourceDot,
+								style: {
+									background: row.running ? "var(--dsw-alias-state-business-primary)" : row.accent ?? "var(--dsw-alias-label-caption)"
+								}
+							})
+						}),
+						h("span", {
+							key: "title",
+							className: Rows_module_css_default.title,
+							children: row.title === "" ? t("session.untitled") : row.title
+						}),
+						h("span", {
+							key: "time",
+							className: Rows_module_css_default.time,
+							children: row.updatedAt === 0 ? "" : relativeTimeLabel(row.updatedAt, Date.now(), t)
+						})
+					]
+				});
+				return h(_deepseek_ai_dsh_client_ui_primitives.HoverCard, {
+					key: row.key,
+					anchor,
+					content: h("div", {
+						className: Rows_module_css_default.hoverContent
+					}, [h("div", {
+						key: "title",
+						className: Rows_module_css_default.hoverTitle,
+						children: row.title === "" ? t("session.untitled") : row.title
+					}), row.updatedAt === 0 ? null : h("div", {
+						key: "time",
+						className: Rows_module_css_default.hoverTime,
+						children: relativeTimeLabel(row.updatedAt, Date.now(), t)
+					}), h("div", {
+						key: "source",
+						className: Rows_module_css_default.hoverStatus
+					}, [h("span", {
+						key: "dot",
+						className: ST.sourceDot,
+						style: {
+							background: row.accent ?? "var(--dsw-alias-label-caption)"
+						}
+					}), h("span", {
+						key: "label",
+						children: row.sourceLabel
+					})]), row.subtitle === void 0 ? null : h("div", {
+						key: "subtitle",
+						className: Rows_module_css_default.hoverPath,
+						children: row.subtitle
+					})]),
+					openDelayMs: 800,
+					grouped: true,
+					copyText: row.title === "" ? void 0 : row.title,
+					copyLabel: t("copy"),
+					copiedLabel: t("hover.copied")
+				});
+			});
+			return h("div", {
+				className: WorkspaceBrowser_module_css_default.groupSection
+			}, [h("div", {
+				key: "header",
+				className: Rows_module_css_default.projectRow,
+				role: "treeitem",
+				"aria-expanded": true,
+				children: [
+					h("span", {
+						key: "dot",
+						className: clsx(Rows_module_css_default.slot, Rows_module_css_default.folder),
+						children: h("span", {
+							className: ST.sourceDot,
+							style: {
+								background: section.accent ?? "var(--dsw-alias-label-caption)"
+							}
+						})
+					}),
+					h("span", {
+						key: "label",
+						className: Rows_module_css_default.projectText,
+						children: h("span", {
+							className: Rows_module_css_default.title,
+							children: section.label
+						})
+					}),
+					h("span", {
+						key: "count",
+						className: ST.count,
+						children: String(section.rows.length)
+					})
+				]
+			}), sessionRows]);
+		}
+		/**
+		* The shipped compact relative-time wording for a foreign row. The source may
+		* report an epoch of 0 for "unknown", which renders as an empty cell.
+		* @param updatedAt - epoch ms from the source.
+		* @param now - render-time epoch ms.
+		* @param t - the browser's locale seat.
+		* @returns the compact label ("刚刚", "5分", ...).
+		*/
+		function relativeTimeLabel(updatedAt, now, t) {
+			const { unit, n } = (0, _deepseek_ai_dsh_client_ui_primitives.relativeTime)(updatedAt, now);
+			return unit === "now" ? t("time.now") : t(`time.${unit}`, {
+				n
+			});
+		}
 		/** A tag tab's definition, or undefined while it is being renamed away. */
 		function tagTabDefinition(state, id) {
 			return state.tabs.find((tag) => tag.id === id);
@@ -5398,7 +5628,7 @@ window.__ModuleLoader__.load({
 		* The filter strip: fixed tabs, one tab per tag, an inline create field,
 		* double-click to rename a tag and its row menu to delete it.
 		*/
-		function SessionFilterTabs({ counts, t }) {
+		function SessionFilterTabs({ counts, sources, t }) {
 			const state = useSessionTabState();
 			const actions = sessionTabs().actions;
 			const [adding, setAdding] = (0, react.useState)(false);
@@ -5435,6 +5665,10 @@ window.__ModuleLoader__.load({
 				name: tag.name,
 				color: tag.color,
 				tagId: tag.id
+			})), ...sources.map((source) => ({
+				id: `source:${source.id}`,
+				name: source.label,
+				color: source.accent
 			}))];
 			return h("div", {
 				className: ST.tabs,
@@ -5675,6 +5909,268 @@ window.__ModuleLoader__.load({
 			}, t("tags.create"))])]);
 		}
 		//#endregion
+		//#region local/session-sources.js
+		/**
+		 * Local extension (this package only): the Session SOURCE registry.
+		 *
+		 * The browsing region derives everything from the local Session Controller.
+		 * A source is a third-party contribution of Sessions that live somewhere
+		 * else (another machine's harness, a projection, a fixture). The region does
+		 * not care where they come from: it renders them through the same rows, the
+		 * same groups, the same filter tabs.
+		 *
+		 * Contract, for a small external plugin:
+		 *
+		 *   inject: ['sidebarSessionSources']
+		 *   apply(ctx) {
+		 *     ctx.sidebarSessionSources.register({
+		 *       id: 'acme',                 // stable, unique
+		 *       label: 'Acme box',          // group header text
+		 *       accent: '#6f8ff5',          // optional row dot color
+		 *       subscribe: (listener) => interop.track(() => listener()),
+		 *       getSnapshot: () => ({ groups: [...], sessions: [...] }),
+		 *       open: (session) => {...},   // required: the source owns navigation
+		 *     })
+		 *   }
+		 *
+		 * Everything a source returns is a plain snapshot; the region subscribes
+		 * through the source and re-derives on change. Nothing is written into the
+		 * session log, and no local Session is required for a foreign row.
+		 */
+		/** Stable empty result, so a source-less region never re-renders from a fresh array. */
+		const EMPTY_SOURCE_PAGES = [];
+		/** Row/session identity prefix that keeps a foreign id from colliding with a local SessionId. */
+		const SOURCE_SESSION_PREFIX = "src:";
+		/** Key of the built-in pseudo-source that reports the local Session Controller. */
+		const LOCAL_SOURCE_ID = "local";
+		/**
+		* Compose one renderable id for a foreign Session. The source id and the
+		* source's own session id are both opaque, so the pair is joined and never
+		* parsed back by the region.
+		* @param sourceId - registering source.
+		* @param sessionId - the source's own identity for the Session.
+		* @returns the opaque region id.
+		*/
+		function sourceSessionKey(sourceId, sessionId) {
+			return `${SOURCE_SESSION_PREFIX}${sourceId}:${sessionId}`;
+		}
+		/**
+		* Registry service: sources register, unregister on their own fiber, and the
+		* region reads one merged snapshot.
+		*/
+		var SidebarSessionSources = class extends _deepseek_ai_cordis.Service {
+			/** Registered sources in registration order; the first registration wins an id conflict. */
+			sources = [];
+			/** Publishes on any source change, so the region re-reads one snapshot. */
+			version = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(0);
+			/**
+			* @param ctx - Client root Context (the service name is declared here).
+			*/
+			constructor(ctx) {
+				super(ctx, "sidebarSessionSources");
+			}
+			/**
+			* Register one Session source. The returned disposer unregisters it; a
+			* plugin's own fiber calls it on unload, and an id already taken is
+			* rejected rather than shadowing another contributor.
+			* @param source - the source descriptor.
+			* @returns the disposer.
+			*/
+			register(source) {
+				const id = typeof source?.id === "string" ? source.id.trim() : "";
+				if (id === "") throw new Error("sidebarSessionSources.register: `id` is required");
+				if (id === LOCAL_SOURCE_ID) throw new Error(`sidebarSessionSources.register: \`${LOCAL_SOURCE_ID}\` is reserved`);
+				if (typeof source.getSnapshot !== "function") throw new Error(`sidebarSessionSources.register: source "${id}" has no getSnapshot()`);
+				if (typeof source.open !== "function") throw new Error(`sidebarSessionSources.register: source "${id}" has no open()`);
+				if (this.sources.some((entry) => entry.id === id)) throw new Error(`sidebarSessionSources.register: source "${id}" is already registered`);
+				const entry = {
+					...source,
+					id
+				};
+				this.sources = [...this.sources, entry];
+				this.version.set(this.version.getSnapshot() + 1);
+				let disposed = false;
+				return () => {
+					if (disposed) return;
+					disposed = true;
+					this.sources = this.sources.filter((candidate) => candidate !== entry);
+					this.version.set(this.version.getSnapshot() + 1);
+				};
+			}
+			/** The registered sources, in registration order (stable reference until a change). */
+			list() {
+				return this.sources;
+			}
+			/**
+			* Read every source's current snapshot, tolerating a source that throws or
+			* returns a malformed page: one broken contributor must not blank the list.
+			* @returns one page per source, skipping the ones that failed.
+			*/
+			snapshot() {
+				const pages = [];
+				for (const source of this.sources) {
+					try {
+						const page = source.getSnapshot();
+						if (page === null || typeof page !== "object") continue;
+						pages.push({
+							source,
+							groups: Array.isArray(page.groups) ? page.groups : [],
+							sessions: Array.isArray(page.sessions) ? page.sessions : []
+						});
+					} catch (error) {
+						console.warn(`[sidebar-session-tabs] source "${source.id}" threw in getSnapshot():`, error);
+					}
+				}
+				return pages;
+			}
+		};
+		/**
+		* Observable over every source's page. Two inputs move it: a registry change
+		* (a source came or went) and a source notification (that source's data
+		* changed). The snapshot is recomputed only when one of them moved, so
+		* `getSnapshot` is stable between changes — which `useSyncExternalStore`
+		* requires to avoid a render loop.
+		* @param registry - the source registry service.
+		* @returns an observable of the merged source pages.
+		*/
+		function createSourcePagesObservable(registry) {
+			const listeners = new Set();
+			let stops = [];
+			let revision = 0;
+			let cached = null;
+			let cachedAt = -1;
+			const notify = () => {
+				revision += 1;
+				for (const listener of [...listeners]) try {
+					listener();
+				} catch (error) {
+					console.warn("[sidebar-session-tabs] source listener failed:", error);
+				}
+			};
+			const resubscribe = () => {
+				for (const stop of stops) try {
+					stop();
+				} catch {}
+				stops = [];
+				for (const source of registry.list()) {
+					if (typeof source.subscribe !== "function") continue;
+					try {
+						const stop = source.subscribe(notify);
+						if (typeof stop === "function") stops.push(stop);
+					} catch (error) {
+						console.warn(`[sidebar-session-tabs] source "${source.id}" threw in subscribe():`, error);
+					}
+				}
+			};
+			const stopRegistry = registry.version.subscribe(() => {
+				resubscribe();
+				notify();
+			});
+			resubscribe();
+			return {
+				getSnapshot: () => {
+					const at = registry.version.getSnapshot() * 1e6 + revision;
+					if (cached === null || at !== cachedAt) {
+						cachedAt = at;
+						cached = registry.snapshot();
+					}
+					return cached;
+				},
+				subscribe: (listener) => {
+					listeners.add(listener);
+					return () => {
+						listeners.delete(listener);
+						if (listeners.size === 0) {
+							stopRegistry();
+							for (const stop of stops) try {
+								stop();
+							} catch {}
+							stops = [];
+						}
+					};
+				}
+			};
+		}
+		/**
+		* Hook over the merged source pages. Absent service, no sources, or a source
+		* that fails all resolve to an empty array, and the region then renders
+		* exactly what it rendered before any source existed.
+		* @param registry - the source registry service, or undefined on an older host.
+		* @returns the current merged pages.
+		*/
+		function useSourcePages(registry) {
+			const [observable, setObservable] = (0, react.useState)(null);
+			(0, react.useEffect)(() => {
+				if (registry === void 0) {
+					setObservable(null);
+					return;
+				}
+				const next = createSourcePagesObservable(registry);
+				setObservable(next);
+				return () => {
+					setObservable(null);
+					next.subscribe(() => {})();
+				};
+			}, [registry]);
+			const subscribe = (0, react.useCallback)((listener) => observable === null ? () => {} : observable.subscribe(listener), [observable]);
+			const getSnapshot = (0, react.useCallback)(() => observable === null ? EMPTY_SOURCE_PAGES : observable.getSnapshot(), [observable]);
+			return (0, react.useSyncExternalStore)(subscribe, getSnapshot);
+		}
+		/**
+		* Normalize one source page into region rows plus the groups they belong to.
+		* A foreign Session is never merged into a local Workspace: it keeps its own
+		* group, named by the source, so "which machine is this from" is structural
+		* rather than a label someone has to render per row.
+		* @param pages - merged source pages.
+		* @returns group sections and the row facts the region renders.
+		*/
+		function deriveSourceSections(pages) {
+			const sections = [];
+			for (const page of pages) {
+				const source = page.source;
+				if (page.sessions.length === 0) continue;
+				const declared = new Map();
+				for (const group of page.groups) {
+					if (group === null || typeof group !== "object" || typeof group.id !== "string") continue;
+					declared.set(group.id, group);
+				}
+				const byGroup = new Map();
+				for (const session of page.sessions) {
+					if (session === null || typeof session !== "object" || typeof session.id !== "string") continue;
+					const groupId = typeof session.group === "string" ? session.group : "";
+					const list = byGroup.get(groupId);
+					const row = {
+						source,
+						sourceId: source.id,
+						sourceLabel: typeof source.label === "string" && source.label !== "" ? source.label : source.id,
+						accent: typeof source.accent === "string" ? source.accent : void 0,
+						key: sourceSessionKey(source.id, session.id),
+						sessionId: session.id,
+						title: typeof session.title === "string" ? session.title : "",
+						updatedAt: Number.isFinite(session.updatedAt) ? session.updatedAt : 0,
+						running: session.running === true,
+						pending: session.pending === true,
+						subtitle: typeof session.subtitle === "string" ? session.subtitle : void 0,
+						raw: session
+					};
+					if (list === void 0) byGroup.set(groupId, [row]);
+					else list.push(row);
+				}
+				for (const [groupId, rows] of byGroup) {
+					const group = declared.get(groupId);
+					sections.push({
+						sourceId: source.id,
+						groupId,
+						label: typeof group?.label === "string" && group.label !== "" ? group.label : (typeof source.label === "string" && source.label !== "" ? source.label : source.id),
+						accent: typeof source.accent === "string" ? source.accent : void 0,
+						source,
+						rows: rows.slice().sort((left, right) => right.updatedAt - left.updatedAt)
+					});
+				}
+			}
+			return sections;
+		}
+		//#endregion
 		//#region lib/types/client/index.js
 		/** Dictionary namespace owned by this plugin. */
 		const NS = "workspace";
@@ -5712,6 +6208,7 @@ window.__ModuleLoader__.load({
 				...viewHandle,
 				create: () => viewInstance
 			};
+			const sessionSources = new SidebarSessionSources(ctx);
 			const rowToast = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(null);
 			let toastSeq = 0;
 			const notify = (toast) => {
@@ -5864,6 +6361,7 @@ window.__ModuleLoader__.load({
 				}
 			});
 			const browserInjected = () => ({
+				sessionSources,
 				startSession: (workspaceId, options) => {
 					uiWorkspace.startSession(workspaceId, options);
 				},
